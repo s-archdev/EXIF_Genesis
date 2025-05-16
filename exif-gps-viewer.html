@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EXIF GPS Viewer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .upload-container {
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            background-color: #f8f9fa;
+            transition: all 0.3s ease;
+        }
+        .upload-container:hover {
+            border-color: #007bff;
+            background-color: #f1f7ff;
+        }
+        .upload-container.dragover {
+            border-color: #28a745;
+            background-color: #e8f4ea;
+        }
+        .btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .btn:hover {
+            background-color: #0069d9;
+        }
+        #mapContainer {
+            height: 400px;
+            margin-top: 20px;
+            border-radius: 8px;
+            overflow: hidden;
+            display: none;
+        }
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+        .exif-info {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+        }
+        .exif-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .exif-table td, .exif-table th {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .exif-table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .ad-container {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #fff8e1;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #ffe082;
+        }
+        .ad-placeholder {
+            color: #7d6608;
+            font-size: 14px;
+        }
+        #error-message {
+            color: #dc3545;
+            margin-top: 10px;
+            display: none;
+        }
+        .preview-container {
+            margin-top: 20px;
+            text-align: center;
+            display: none;
+        }
+        #imagePreview {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .logo {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .logo span {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        footer {
+            margin-top: 30px;
+            text-align: center;
+            color: #6c757d;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <span>EXIF GPS Viewer</span>
+        </div>
+        
+        <div class="upload-container" id="dropArea">
+            <h2>Upload an Image with GPS Data</h2>
+            <p>Drag and drop an image here or click to select</p>
+            <input type="file" id="imageInput" accept="image/*" style="display: none;">
+            <button class="btn" id="selectButton">Select Image</button>
+            <div id="error-message"></div>
+        </div>
+        
+        <div class="ad-container">
+            <div class="ad-placeholder">Advertisement Space</div>
+        </div>
+        
+        <div class="preview-container" id="previewContainer">
+            <h3>Image Preview</h3>
+            <img id="imagePreview" alt="Image preview">
+        </div>
+        
+        <div class="exif-info" id="exifInfo">
+            <h3>EXIF GPS Information</h3>
+            <table class="exif-table" id="exifTable">
+                <tr>
+                    <th>Property</th>
+                    <th>Value</th>
+                </tr>
+            </table>
+        </div>
+        
+        <div id="mapContainer">
+            <h3>Location</h3>
+            <div id="map"></div>
+        </div>
+        
+        <div class="ad-container">
+            <div class="ad-placeholder">Advertisement Space</div>
+        </div>
+    </div>
+    
+    <footer>
+        <p>© 2025 EXIF GPS Viewer | Servo Core</p>
+    </footer>
+
+    <script>
+        // Elements
+        const dropArea = document.getElementById('dropArea');
+        const imageInput = document.getElementById('imageInput');
+        const selectButton = document.getElementById('selectButton');
+        const exifInfo = document.getElementById('exifInfo');
+        const exifTable = document.getElementById('exifTable');
+        const mapContainer = document.getElementById('mapContainer');
+        const errorMessage = document.getElementById('error-message');
+        const previewContainer = document.getElementById('previewContainer');
+        const imagePreview = document.getElementById('imagePreview');
+        
+        // Initialize variables
+        let map;
+        let marker;
+        
+        // Event listeners
+        selectButton.addEventListener('click', () => {
+            imageInput.click();
+        });
+        
+        imageInput.addEventListener('change', handleImageSelection);
+        
+        dropArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropArea.classList.add('dragover');
+        });
+        
+        dropArea.addEventListener('dragleave', () => {
+            dropArea.classList.remove('dragover');
+        });
+        
+        dropArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropArea.classList.remove('dragover');
+            
+            if (e.dataTransfer.files.length) {
+                imageInput.files = e.dataTransfer.files;
+                handleImageSelection();
+            }
+        });
+        
+        // Functions
+        function handleImageSelection() {
+            const file = imageInput.files[0];
+            
+            if (!file || !file.type.startsWith('image/')) {
+                showError('Please select a valid image file.');
+                return;
+            }
+            
+            // Reset UI
+            resetUI();
+            
+            // Show image preview
+            displayImagePreview(file);
+            
+            // Process the image for EXIF data
+            processImage(file);
+        }
+        
+        function displayImagePreview(file) {
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                imagePreview.src = e.target.result;
+                previewContainer.style.display = 'block';
+            };
+            
+            reader.readAsDataURL(file);
+        }
+        
+        function processImage(file) {
+            EXIF.getData(file, function() {
+                const exifData = EXIF.getAllTags(this);
+                
+                if (!exifData || !exifData.GPSLatitude || !exifData.GPSLongitude) {
+                    showError('No GPS data found in this image. Please try another image with location information.');
+                    return;
+                }
+                
+                // Extract GPS coordinates
+                const latitude = convertDMSToDD(exifData.GPSLatitude, exifData.GPSLatitudeRef);
+                const longitude = convertDMSToDD(exifData.GPSLongitude, exifData.GPSLongitudeRef);
+                
+                if (isNaN(latitude) || isNaN(longitude)) {
+                    showError('Could not process GPS coordinates from this image.');
+                    return;
+                }
+                
+                // Display EXIF info
+                displayExifInfo(exifData, latitude, longitude);
+                
+                // Initialize and display the map
+                initMap(latitude, longitude);
+            });
+        }
+        
+        function convertDMSToDD(dmsArray, ref) {
+            if (!dmsArray || dmsArray.length !== 3) {
+                return NaN;
+            }
+            
+            const degrees = dmsArray[0];
+            const minutes = dmsArray[1];
+            const seconds = dmsArray[2];
+            
+            let dd = degrees + (minutes / 60) + (seconds / 3600);
+            
+            if (ref === 'S' || ref === 'W') {
+                dd *= -1;
+            }
+            
+            return dd;
+        }
+        
+        function displayExifInfo(exifData, latitude, longitude) {
+            // Clear previous data
+            while (exifTable.rows.length > 1) {
+                exifTable.deleteRow(1);
+            }
+            
+            // Add GPS info to table
+            addTableRow('Latitude', latitude.toFixed(6) + '° ' + (latitude >= 0 ? 'N' : 'S'));
+            addTableRow('Longitude', longitude.toFixed(6) + '° ' + (longitude >= 0 ? 'E' : 'W'));
+            
+            // Add other potentially useful EXIF data
+            if (exifData.DateTimeOriginal) {
+                addTableRow('Date Taken', exifData.DateTimeOriginal);
+            }
+            
+            if (exifData.Make) {
+                addTableRow('Camera Make', exifData.Make);
+            }
+            
+            if (exifData.Model) {
+                addTableRow('Camera Model', exifData.Model);
+            }
+            
+            if (exifData.GPSAltitude) {
+                const altitude = exifData.GPSAltitude;
+                addTableRow('Altitude', `${altitude} meters`);
+            }
+            
+            // Show the EXIF info section
+            exifInfo.style.display = 'block';
+        }
+        
+        function addTableRow(property, value) {
+            const row = exifTable.insertRow();
+            const cell1 = row.insertCell(0);
+            const cell2 = row.insertCell(1);
+            
+            cell1.textContent = property;
+            cell2.textContent = value;
+        }
+        
+        function initMap(latitude, longitude) {
+            // Load Google Maps API
+            if (!window.google || !window.google.maps) {
+                const script = document.createElement('script');
+                script.src = `https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initializeMap`;
+                script.async = true;
+                script.defer = true;
+                
+                // Store coordinates in global variables to be used after API loads
+                window.mapInitParams = {
+                    latitude: latitude,
+                    longitude: longitude
+                };
+                
+                document.head.appendChild(script);
+            } else {
+                // Google Maps API already loaded
+                createMap(latitude, longitude);
+            }
+        }
+        
+        // This function will be called by the Google Maps API once loaded
+        window.initializeMap = function() {
+            if (window.mapInitParams) {
+                createMap(window.mapInitParams.latitude, window.mapInitParams.longitude);
+            }
+        };
+        
+        function createMap(latitude, longitude) {
+            const location = { lat: latitude, lng: longitude };
+            
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: location,
+                zoom: 13,
+                mapTypeId: 'hybrid'
+            });
+            
+            marker = new google.maps.Marker({
+                position: location,
+                map: map,
+                title: 'Photo Location'
+            });
+            
+            // Show map container
+            mapContainer.style.display = 'block';
+        }
+        
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+        
+        function resetUI() {
+            errorMessage.style.display = 'none';
+            exifInfo.style.display = 'none';
+            mapContainer.style.display = 'none';
+        }
+    </script>
+    
+    <!-- Google Maps API placeholder -->
+    <script>
+        // This is just a placeholder function to prevent errors if the map is initialized before the API loads
+        // You'll need to replace 'YOUR_API_KEY' in the initMap function with an actual Google Maps API key
+        window.google = window.google || {};
+        window.google.maps = window.google.maps || {};
+    </script>
+</body>
+</html>
